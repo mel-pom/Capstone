@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes.js";
 import { auth } from "./middleware/auth.js";
 import clientRoutes from "./routes/clientRoutes.js";
+import entryRoutes from "./routes/entryRoutes.js";
 
 dotenv.config();
 
@@ -26,6 +27,9 @@ app.use("/api/auth", authRoutes);
 
 // ====== CLIENT ROUTES (CREATE, READ, UPDATE, DELETE) ======
 app.use("/api/clients", clientRoutes);
+
+// ====== ENTRY ROUTES (CREATE, READ, UPDATE, DELETE) ======
+app.use("/api/entries", entryRoutes);
 
 // ====== PROTECTED TEST ROUTE ======
 app.get("/api/secret", auth, (req, res) => {

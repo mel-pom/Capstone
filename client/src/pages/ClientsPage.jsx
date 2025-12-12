@@ -1,92 +1,100 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import { api, authHeaders } from "../api";
+import AppLayout from "../components/AppLayout";
+import Loader from "../components/Loader";
+import Alert from "../components/Alert";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5000";
-
+/**
+ * ClientsPage component
+ * Displays list of all clients with links to their detail pages
+ */
 function ClientsPage() {
+  // State for clients list
   const [clients, setClients] = useState([]);
+  // Loading state
+  const [loading, setLoading] = useState(true);
+  // Error message state
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const token = localStorage.getItem("token");
-
   useEffect(() => {
+    // Check if user is authenticated
+    const token = localStorage.getItem("token");
     if (!token) {
+      // Redirect to login if no token
       navigate("/");
       return;
     }
 
+    /**
+     * Fetch all clients from API
+     */
     const fetchClients = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/api/clients`, {
-          headers: { Authorization: `Bearer ${token}` }
+        setLoading(true);
+        setError("");
+
+        // Get clients list with authentication headers
+        const res = await api.get("/api/clients", {
+          headers: authHeaders(),
         });
+
         setClients(res.data);
       } catch (err) {
-        console.error(err);
-        setError("Failed to load clients");
+        console.error("Fetch clients error:", err);
+        // Redirect to login on authentication errors
+        if (err.response?.status === 401 || err.response?.status === 403) {
+          navigate("/");
+        } else {
+          setError("Failed to load clients.");
+        }
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchClients();
-  }, [token, navigate]);
+  }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="bg-white shadow-sm">
-        <div className="mx-auto max-w-4xl px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-semibold text-slate-900">
-            Clients
-          </h1>
-          <button
-            onClick={() => {
-              localStorage.removeItem("token");
-              navigate("/");
-            }}
-            className="text-sm text-slate-600 hover:text-red-600"
-          >
-            Log out
-          </button>
-        </div>
-      </header>
+    <AppLayout
+      title="Clients"
+      subtitle="Select a client to view their daily documentation."
+    >
+      {error && <Alert type="error">{error}</Alert>}
 
-      <main className="mx-auto max-w-4xl px-4 py-6">
-        {error && (
-          <div className="mb-4 rounded-md bg-red-100 text-red-700 px-3 py-2 text-sm">
-            {error}
-          </div>
-        )}
-
-        {clients.length === 0 ? (
-          <p className="text-slate-600 text-sm">
-            No clients yet. You can create clients via the API or admin UI later.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {clients.map((client) => (
-              <li
-                key={client._id}
-                className="bg-white rounded-lg shadow-sm px-4 py-3 flex justify-between items-center"
+      {loading ? (
+        <Loader text="Loading clients..." />
+      ) : clients.length === 0 ? (
+        <p className="text-sm text-slate-600">
+          No clients yet. You can create clients through the admin interface or
+          API.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {clients.map((client) => (
+            <li
+              key={client._id}
+              className="bg-white rounded-lg shadow-sm px-4 py-3 flex justify-between items-center"
+            >
+              <div>
+                <p className="font-medium text-slate-900">{client.name}</p>
+                {client.notes && (
+                  <p className="text-xs text-slate-500">{client.notes}</p>
+                )}
+              </div>
+              <Link
+                to={`/clients/${client._id}`}
+                className="text-sm text-indigo-600 hover:underline"
               >
-                <div>
-                  <p className="font-medium text-slate-900">{client.name}</p>
-                  {client.notes && (
-                    <p className="text-xs text-slate-500">{client.notes}</p>
-                  )}
-                </div>
-                <Link
-                  to={`/clients/${client._id}`}
-                  className="text-sm text-indigo-600 hover:underline"
-                >
-                  View
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </main>
-    </div>
+                View
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </AppLayout>
   );
 }
 

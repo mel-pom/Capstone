@@ -1,28 +1,47 @@
 import { useState } from "react";
 import axios from "axios";
 
+// API base URL from environment or default to localhost
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5000";
 console.log("API_BASE from env:", API_BASE);
 
+/**
+ * LoginPage component
+ * Handles user authentication and redirects to clients page on success
+ */
 function LoginPage() {
+  // Form state for email and password
   const [form, setForm] = useState({ email: "", password: "" });
+  // Error message state
   const [error, setError] = useState("");
 
+  /**
+   * Handle form input changes
+   * Updates form state with new input values
+   */
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  /**
+   * Handle form submission
+   * Authenticates user with backend and stores token in localStorage
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
     try {
+      // Send login request to backend
       const res = await axios.post(`${API_BASE}/api/auth/login`, form);
       const token = res.data.token;
+      // Store JWT token in localStorage for future authenticated requests
       localStorage.setItem("token", token);
+      // Redirect to clients page after successful login
       window.location.href = "/clients";
     } catch (err) {
       console.error(err);
+      // Display error message from server or generic error
       setError(err.response?.data?.error || "Login failed");
     }
   };

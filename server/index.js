@@ -18,7 +18,16 @@ const PORT = process.env.PORT || 5000;
 
 // ============ Middleware ============
 // Enable CORS to allow cross-origin requests from frontend
-app.use(cors());
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.FRONTEND_URL, // set this in Render after you know the UI URL
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+  })
+);
 // Parse JSON request bodies
 app.use(express.json());
 

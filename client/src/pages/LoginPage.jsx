@@ -1,5 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
+import { getErrorMessage } from "../utils/errorHandler.js";
 
 // API base URL from environment or default to localhost
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5000";
@@ -40,9 +41,8 @@ function LoginPage() {
       // Redirect to clients page after successful login
       window.location.href = "/clients";
     } catch (err) {
-      console.error(err);
-      // Display error message from server or generic error
-      setError(err.response?.data?.error || "Login failed");
+      console.error("Login error:", err);
+      setError(getErrorMessage(err, "Login failed. Please check your credentials and try again."));
     }
   };
 

@@ -4,6 +4,8 @@ import { api, authHeaders } from "../api";
 import AppLayout from "../components/AppLayout";
 import Loader from "../components/Loader";
 import Alert from "../components/Alert";
+import ConfirmDialog from "../components/ConfirmDialog";
+import { getErrorMessage, isAuthError } from "../utils/errorHandler.js";
 
 // Available entry categories
 const CATEGORIES = ["meals", "behavior", "outing", "medical", "notes"];
@@ -26,6 +28,13 @@ function ClientDetailPage() {
   const [loadingEntries, setLoadingEntries] = useState(true);
   // Error message state
   const [error, setError] = useState("");
+
+  // Delete confirmation dialog state
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    entryId: null,
+    entryDescription: "",
+  });
 
   // Filter states
   const [category, setCategory] = useState("");
@@ -56,13 +65,11 @@ function ClientDetailPage() {
         setClient(res.data);
       } catch (err) {
         console.error("Fetch client error:", err);
-        if (err.response?.status === 401 || err.response?.status === 403) {
+        if (isAuthError(err)) {
           navigate("/");
-        } else if (err.response?.status === 404) {
-          setError("This client could not be found.");
-        } else {
-          setError("Failed to load client info.");
+          return;
         }
+        setError(getErrorMessage(err, "Failed to load client information."));
       } finally {
         setLoadingClient(false);
       }
@@ -95,11 +102,11 @@ function ClientDetailPage() {
       setEntries(res.data);
     } catch (err) {
       console.error("Fetch entries error:", err);
-      if (err.response?.status === 401 || err.response?.status === 403) {
+      if (isAuthError(err)) {
         navigate("/");
-      } else {
-        setError("Failed to load entries.");
+        return;
       }
+      setError(getErrorMessage(err, "Failed to load entries."));
     } finally {
       setLoadingEntries(false);
     }
@@ -132,6 +139,38 @@ function ClientDetailPage() {
   };
 
   /**
+   * Remove a specific filter
+   */
+  const handleRemoveFilter = (filterType) => {
+    if (filterType === "category") {
+      setCategory("");
+    } else if (filterType === "search") {
+      setSearch("");
+    } else if (filterType === "startDate") {
+      setStartDate("");
+    } else if (filterType === "endDate") {
+      setEndDate("");
+    }
+    // Note: We'll call fetchEntries after state updates via useEffect
+  };
+
+  /**
+   * Apply category filter via quick button
+   */
+  const handleCategoryFilter = (cat) => {
+    setCategory(cat === category ? "" : cat);
+  };
+
+  // Refetch entries when filters change (after state updates)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchEntries();
+    }, 100);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, search, startDate, endDate]);
+
+  /**
    * Format ISO date string to localized date/time string
    * @param {string} iso - ISO date string
    * @returns {string} Formatted date/time string
@@ -142,33 +181,87 @@ function ClientDetailPage() {
     return d.toLocaleString();
   };
 
+  /**
+   * Format date for display in filter chip
+   */
+  const formatDateForChip = (dateString) => {
+    if (!dateString) return "";
+    const d = new Date(dateString);
+    return d.toLocaleDateString();
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = category || search || startDate || endDate;
+
+  /**
+   * Handle delete entry confirmation
+   */
+  const handleDeleteClick = (entryId, entryDescription) => {
+    setDeleteConfirm({
+      isOpen: true,
+      entryId,
+      entryDescription: entryDescription.substring(0, 50) + (entryDescription.length > 50 ? "..." : ""),
+    });
+  };
+
+  /**
+   * Handle confirmed entry deletion
+   */
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm.entryId) return;
+
+    try {
+      setError("");
+      await api.delete(`/api/entries/${deleteConfirm.entryId}`, {
+        headers: authHeaders(),
+      });
+
+      // Close dialog and refresh entries
+      setDeleteConfirm({ isOpen: false, entryId: null, entryDescription: "" });
+      fetchEntries();
+    } catch (err) {
+      console.error("Delete entry error:", err);
+      if (isAuthError(err)) {
+        navigate("/");
+        return;
+      }
+      setError(getErrorMessage(err, "Failed to delete entry. Please try again."));
+      setDeleteConfirm({ isOpen: false, entryId: null, entryDescription: "" });
+    }
+  };
+
+  /**
+   * Handle delete cancellation
+   */
+  const handleDeleteCancel = () => {
+    setDeleteConfirm({ isOpen: false, entryId: null, entryDescription: "" });
+  };
+
   return (
     <AppLayout
       title={client?.name || "Client details"}
       subtitle="Daily documentation timeline and filters."
-      actions={
-        client && (
-          <Link
-            to={`/clients/${id}/new-entry`}
-            className="inline-flex items-center justify-center rounded-md bg-indigo-600 text-white text-xs px-3 py-2 hover:bg-indigo-700 transition"
-          >
-            + New Entry
-          </Link>
-        )
-      }
     >
       {error && <Alert type="error">{error}</Alert>}
 
       {/* Client info card */}
-      <section className="bg-white rounded-lg shadow-sm p-4 flex gap-4 items-center mb-6">
+      <section className="bg-white rounded-lg shadow-sm p-3 sm:p-4 flex gap-3 sm:gap-4 items-center mb-4 sm:mb-6">
         {loadingClient ? (
           <Loader text="Loading client..." />
         ) : client ? (
           <>
-            <div className="h-16 w-16 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-lg font-semibold">
-              {client.name?.charAt(0)?.toUpperCase() || "C"}
-            </div>
-            <div className="flex-1">
+            {client.photo ? (
+              <img
+                src={client.photo}
+                alt={client.name}
+                className="h-16 w-16 rounded-full object-cover border-2 border-slate-200 flex-shrink-0"
+              />
+            ) : (
+              <div className="h-16 w-16 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-lg font-semibold flex-shrink-0">
+                {client.name?.charAt(0)?.toUpperCase() || "C"}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
               <h2 className="text-lg font-semibold text-slate-900">
                 {client.name}
               </h2>
@@ -186,11 +279,175 @@ function ClientDetailPage() {
         )}
       </section>
 
-      {/* Filters */}
-      <section className="bg-white rounded-lg shadow-sm p-4 mb-6">
+      {/* Action Buttons Card */}
+      {client && (
+        <section className="bg-white rounded-lg shadow-sm p-3 sm:p-4 mb-3 sm:mb-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to={`/clients/${id}/meals`}
+              className="inline-flex items-center justify-center rounded-md bg-emerald-600 text-white text-xs px-3 py-2 hover:bg-emerald-700 transition"
+            >
+              + Meals
+            </Link>
+            <Link
+              to={`/clients/${id}/new-entry`}
+              className="inline-flex items-center justify-center rounded-md bg-indigo-600 text-white text-xs px-3 py-2 hover:bg-indigo-700 transition"
+            >
+              + New Entry
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {/* Quick Category Filters */}
+      <section className="bg-white rounded-lg shadow-sm p-3 sm:p-4 mb-3 sm:mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-600 mr-1 sm:mr-2 w-full sm:w-auto">
+            Quick filters:
+          </span>
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => handleCategoryFilter(cat)}
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-medium transition ${
+                category === cat
+                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              {cat.charAt(0).toUpperCase() + cat.slice(1)}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Active Filter Chips */}
+      {hasActiveFilters && (
+        <section className="bg-white rounded-lg shadow-sm p-3 sm:p-4 mb-3 sm:mb-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-slate-600 mr-1 sm:mr-2 w-full sm:w-auto">
+              Active filters:
+            </span>
+            {category && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-800 text-xs font-medium">
+                Category: {category.charAt(0).toUpperCase() + category.slice(1)}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveFilter("category")}
+                  className="hover:bg-indigo-200 rounded-full p-0.5 transition"
+                  aria-label="Remove category filter"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </span>
+            )}
+            {search && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-800 text-xs font-medium">
+                Search: "{search}"
+                <button
+                  type="button"
+                  onClick={() => handleRemoveFilter("search")}
+                  className="hover:bg-indigo-200 rounded-full p-0.5 transition"
+                  aria-label="Remove search filter"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </span>
+            )}
+            {startDate && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-800 text-xs font-medium">
+                From: {formatDateForChip(startDate)}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveFilter("startDate")}
+                  className="hover:bg-indigo-200 rounded-full p-0.5 transition"
+                  aria-label="Remove start date filter"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </span>
+            )}
+            {endDate && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-800 text-xs font-medium">
+                To: {formatDateForChip(endDate)}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveFilter("endDate")}
+                  className="hover:bg-indigo-200 rounded-full p-0.5 transition"
+                  aria-label="Remove end date filter"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="ml-auto px-3 py-1.5 rounded-full bg-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-300 transition"
+            >
+              Clear all
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Advanced Filters Form */}
+      <section className="bg-white rounded-lg shadow-sm p-3 sm:p-4 mb-4 sm:mb-6">
+        <h3 className="text-sm font-semibold text-slate-800 mb-3">
+          Advanced Filters
+        </h3>
         <form
           onSubmit={handleApplyFilters}
-          className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 items-end"
         >
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -247,7 +504,7 @@ function ClientDetailPage() {
             />
           </div>
 
-          <div className="md:col-span-4 flex gap-2 justify-end">
+          <div className="sm:col-span-2 lg:col-span-4 flex gap-2 justify-end">
             <button
               type="button"
               onClick={handleClearFilters}
@@ -266,7 +523,7 @@ function ClientDetailPage() {
       </section>
 
       {/* Entries timeline */}
-      <section className="bg-white rounded-lg shadow-sm p-4">
+      <section className="bg-white rounded-lg shadow-sm p-3 sm:p-4">
         <h2 className="text-sm font-semibold text-slate-800 mb-3">Entries</h2>
 
         {loadingEntries ? (
@@ -280,26 +537,48 @@ function ClientDetailPage() {
             {entries.map((entry) => (
               <li
                 key={entry._id}
-                className="relative border border-slate-200 rounded-md px-4 py-3"
+                className="relative border border-slate-200 rounded-md px-3 sm:px-4 py-2 sm:py-3"
               >
-                <div className="flex justify-between items-start gap-3">
-                  <div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-3">
+                  <div className="flex-1 min-w-0">
                     <p className="text-xs uppercase tracking-wide text-slate-500">
                       {entry.category}
                     </p>
-                    <p className="text-sm text-slate-900 mt-1">
+                    <p className="text-sm text-slate-900 mt-1 break-words">
                       {entry.description}
                     </p>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    {entry.createdAt && formatDateTime(entry.createdAt)}
-                  </p>
+                  <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                    <p className="text-xs text-slate-400 whitespace-nowrap">
+                      {entry.createdAt && formatDateTime(entry.createdAt)}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteClick(entry._id, entry.description)}
+                      className="text-red-600 hover:text-red-700 text-xs font-medium transition whitespace-nowrap"
+                      title="Delete entry"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Entry"
+        message={`Are you sure you want to delete this entry? This action cannot be undone.\n\n"${deleteConfirm.entryDescription}"`}
+        confirmText="Delete Entry"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </AppLayout>
   );
 }

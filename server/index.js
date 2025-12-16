@@ -7,6 +7,7 @@ import authRoutes from "./routes/authRoutes.js";
 import { auth } from "./middleware/auth.js";
 import clientRoutes from "./routes/clientRoutes.js";
 import entryRoutes from "./routes/entryRoutes.js";
+import { formatErrorResponse } from "./utils/errorHandler.js";
 
 // Load environment variables from .env file
 dotenv.config();
@@ -52,9 +53,11 @@ app.use((req, res, next) => {
 // Generic error handler
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err);
-  res
-    .status(err.status || 500)
-    .json({ error: err.message || "Internal server error" });
+  const errorResponse = formatErrorResponse(err, "Internal server error");
+  res.status(errorResponse.status).json({
+    error: errorResponse.message,
+    ...(errorResponse.errors && { errors: errorResponse.errors }),
+  });
 });
 
 // ============ MongoDB Connection ============
@@ -64,6 +67,6 @@ mongoose
   .then(() => {
     console.log("Connected to MongoDB");
     // Start Express server on specified port
-    app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
   .catch((err) => console.error("MongoDB connection error:", err));

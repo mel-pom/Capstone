@@ -2,15 +2,14 @@ import express from "express";
 import Entry from "../models/Entry.js";
 import Client from "../models/Client.js";
 import { auth } from "../middleware/auth.js";
+import { isValidObjectId } from "../utils/validateObjectId.js";
+import { formatErrorResponse } from "../utils/errorHandler.js";
 
 const router = express.Router();
 
 /**
  * POST /api/entries
- * Create a new daily documentation entry for a client
- * @body {string} clientId - MongoDB client ID (required)
- * @body {string} category - Entry category: meals, behavior, outing, medical, notes (required)
- * @body {string} description - Entry description/details (required)
+ * Create a new entry for a client
  */
 router.post("/", auth, async (req, res) => {
   try {
@@ -19,100 +18,193 @@ router.post("/", auth, async (req, res) => {
     // Validate required fields
     if (!clientId || !category || !description) {
       return res.status(400).json({
-        error: "clientId, category, and description are required"
+        error: "clientId, category, and description are required",
       });
     }
 
-    // Verify client exists before creating entry
+    // Validate clientId format
+    if (!isValidObjectId(clientId)) {
+      return res.status(400).json({ error: "Invalid client ID format" });
+    }
+
+    // Validate category
+    const validCategories = ["meals", "behavior", "outing", "medical", "notes"];
+    if (!validCategories.includes(category)) {
+      return res.status(400).json({
+        error: `Invalid category. Must be one of: ${validCategories.join(", ")}`,
+      });
+    }
+
+    // Validate description length
+    if (description.trim().length === 0) {
+      return res.status(400).json({ error: "Description cannot be empty" });
+    }
+
+    if (description.length > 5000) {
+      return res.status(400).json({
+        error: "Description must be less than 5000 characters",
+      });
+    }
+
+    // Verify client exists
     const client = await Client.findById(clientId);
     if (!client) {
       return res.status(404).json({ error: "Client not found" });
     }
 
-    // Create new entry document
+    // Check if client is active
+    if (client.isActive === false) {
+      return res.status(400).json({
+        error: "Cannot create entry for inactive client",
+      });
+    }
+
     const entry = await Entry.create({
       clientId,
       category,
-      description
+      description: description.trim(),
     });
 
     res.status(201).json(entry);
   } catch (err) {
     console.error("Create entry error:", err);
-    res.status(500).json({ error: "Failed to create entry" });
+    const errorResponse = formatErrorResponse(err, "Failed to create entry");
+    res.status(errorResponse.status).json({
+      error: errorResponse.message,
+      ...(errorResponse.errors && { errors: errorResponse.errors }),
+    });
   }
 });
 
 /**
  * GET /api/entries/client/:clientId
- * Get entries for a specific client with optional filtering
- * @param {string} clientId - MongoDB client ID
- * @query {string} [category] - Filter by entry category
- * @query {string} [search] - Search in entry descriptions (case-insensitive)
- * @query {string} [startDate] - Filter entries from this date (ISO format)
- * @query {string} [endDate] - Filter entries until this date (ISO format)
- * @returns {Array} List of entries sorted by creation date (newest first)
+ * Get entries for a client, with optional filters:
+ * ?category=behavior&startDate=2025-12-01&endDate=2025-12-03&search=meltdown
  */
 router.get("/client/:clientId", auth, async (req, res) => {
   try {
     const { clientId } = req.params;
     const { category, startDate, endDate, search } = req.query;
 
-    // Start with base filter for client ID
+    if (!isValidObjectId(clientId)) {
+      return res.status(400).json({ error: "Invalid client ID format" });
+    }
+
+    // Verify client exists
+    const client = await Client.findById(clientId);
+    if (!client) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+
     let filter = { clientId };
 
-    // Add category filter if provided
+    // Validate and apply category filter
     if (category) {
+      const validCategories = ["meals", "behavior", "outing", "medical", "notes"];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json({
+          error: `Invalid category filter. Must be one of: ${validCategories.join(", ")}`,
+        });
+      }
       filter.category = category;
     }
 
-    // Add text search filter (case-insensitive regex)
+    // Validate and apply search filter
     if (search) {
-      filter.description = { $regex: search, $options: "i" };
+      if (search.trim().length === 0) {
+        return res.status(400).json({ error: "Search term cannot be empty" });
+      }
+      filter.description = { $regex: search.trim(), $options: "i" };
     }
 
-    // Add date range filters
+    // Validate and apply date filters
     if (startDate || endDate) {
       filter.createdAt = {};
       if (startDate) {
-        // Greater than or equal to start date (beginning of day)
-        filter.createdAt.$gte = new Date(startDate);
+        const start = new Date(startDate);
+        if (isNaN(start.getTime())) {
+          return res.status(400).json({ error: "Invalid start date format" });
+        }
+        filter.createdAt.$gte = start;
       }
       if (endDate) {
-        // Less than or equal to end date (end of day)
-        const d = new Date(endDate);
-        d.setHours(23, 59, 59, 999);
-        filter.createdAt.$lte = d;
+        const end = new Date(endDate);
+        if (isNaN(end.getTime())) {
+          return res.status(400).json({ error: "Invalid end date format" });
+        }
+        end.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = end;
+      }
+      // Validate date range
+      if (startDate && endDate && filter.createdAt.$gte > filter.createdAt.$lte) {
+        return res.status(400).json({
+          error: "Start date must be before or equal to end date",
+        });
       }
     }
 
-    // Find entries matching filters, sorted by creation date (newest first)
-    const entries = await Entry.find(filter)
-      .sort({ createdAt: -1 }); // newest first
-
+    const entries = await Entry.find(filter).sort({ createdAt: -1 });
     res.json(entries);
   } catch (err) {
     console.error("List entries error:", err);
-    res.status(500).json({ error: "Failed to fetch entries" });
+    const errorResponse = formatErrorResponse(err, "Failed to fetch entries");
+    res.status(errorResponse.status).json({
+      error: errorResponse.message,
+    });
   }
 });
 
 /**
  * PUT /api/entries/:id
- * Update an existing entry
- * @param {string} id - MongoDB entry ID
- * @body {string} [category] - Updated entry category
- * @body {string} [description] - Updated entry description
+ * Update an entry
  */
 router.put("/:id", auth, async (req, res) => {
   try {
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ error: "Invalid entry ID format" });
+    }
+
     const { category, description } = req.body;
 
-    // Update entry and return updated document
+    // Validate at least one field is provided
+    if (category === undefined && description === undefined) {
+      return res.status(400).json({
+        error: "At least one field (category or description) must be provided",
+      });
+    }
+
+    // Validate category if provided
+    if (category !== undefined) {
+      const validCategories = ["meals", "behavior", "outing", "medical", "notes"];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json({
+          error: `Invalid category. Must be one of: ${validCategories.join(", ")}`,
+        });
+      }
+    }
+
+    // Validate description if provided
+    if (description !== undefined) {
+      if (description.trim().length === 0) {
+        return res.status(400).json({ error: "Description cannot be empty" });
+      }
+      if (description.length > 5000) {
+        return res.status(400).json({
+          error: "Description must be less than 5000 characters",
+        });
+      }
+    }
+
+    const updateData = {};
+    if (category !== undefined) updateData.category = category;
+    if (description !== undefined) updateData.description = description.trim();
+
     const entry = await Entry.findByIdAndUpdate(
-      req.params.id,
-      { category, description },
-      { new: true, runValidators: true } // Return updated doc and run validators
+      id,
+      updateData,
+      { new: true, runValidators: true }
     );
 
     if (!entry) {
@@ -122,27 +214,39 @@ router.put("/:id", auth, async (req, res) => {
     res.json(entry);
   } catch (err) {
     console.error("Update entry error:", err);
-    res.status(500).json({ error: "Failed to update entry" });
+    const errorResponse = formatErrorResponse(err, "Failed to update entry");
+    res.status(errorResponse.status).json({
+      error: errorResponse.message,
+      ...(errorResponse.errors && { errors: errorResponse.errors }),
+    });
   }
 });
 
 /**
  * DELETE /api/entries/:id
  * Delete an entry
- * @param {string} id - MongoDB entry ID
  */
 router.delete("/:id", auth, async (req, res) => {
   try {
-    const entry = await Entry.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ error: "Invalid entry ID format" });
+    }
+
+    const entry = await Entry.findByIdAndDelete(id);
 
     if (!entry) {
       return res.status(404).json({ error: "Entry not found" });
     }
 
-    res.json({ message: "Entry deleted" });
+    res.json({ message: "Entry deleted successfully" });
   } catch (err) {
     console.error("Delete entry error:", err);
-    res.status(500).json({ error: "Failed to delete entry" });
+    const errorResponse = formatErrorResponse(err, "Failed to delete entry");
+    res.status(errorResponse.status).json({
+      error: errorResponse.message,
+    });
   }
 });
 

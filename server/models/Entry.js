@@ -9,7 +9,7 @@ const entrySchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ["meals", "behavior", "medical", "notes"],
+      enum: ["meals", "behavior", "outing", "medical", "notes"],
       required: true
     },
     description: {

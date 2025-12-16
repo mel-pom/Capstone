@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api, authHeaders } from "../api";
 import AppLayout from "../components/AppLayout";
 import Alert from "../components/Alert";
+import { getErrorMessage, isAuthError } from "../utils/errorHandler.js";
 
 // Available entry categories
 const CATEGORIES = ["meals", "behavior", "outing", "medical", "notes"];
@@ -43,7 +44,7 @@ function NewEntryPage() {
         setClientName(res.data?.name || "");
       } catch (err) {
         console.error("Fetch client name error:", err);
-        if (err.response?.status === 401 || err.response?.status === 403) {
+        if (isAuthError(err)) {
           navigate("/");
         }
       }
@@ -84,10 +85,11 @@ function NewEntryPage() {
       navigate(`/clients/${id}`);
     } catch (err) {
       console.error("Create entry error:", err);
-      setError(
-        err.response?.data?.error ||
-          "Failed to create entry. Please try again."
-      );
+      if (isAuthError(err)) {
+        navigate("/");
+        return;
+      }
+      setError(getErrorMessage(err, "Failed to create entry. Please try again."));
     } finally {
       setSubmitting(false);
     }
@@ -107,7 +109,7 @@ function NewEntryPage() {
         </button>
       }
     >
-      <section className="bg-white rounded-lg shadow-sm p-4 max-w-xl">
+      <section className="bg-white rounded-lg shadow-sm p-3 sm:p-4 max-w-xl mx-auto">
         {error && <Alert type="error">{error}</Alert>}
 
         <form onSubmit={handleSubmit} className="space-y-4">

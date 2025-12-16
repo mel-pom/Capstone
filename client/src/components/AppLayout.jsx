@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 /**
  * AppLayout component
@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
  */
 function AppLayout({ title, subtitle, actions, children }) {
   const navigate = useNavigate();
+  const location = useLocation();
 
   /**
    * Handle user logout
@@ -20,33 +21,54 @@ function AppLayout({ title, subtitle, actions, children }) {
     navigate("/");
   };
 
+  /**
+   * Navigate to clients list page
+   */
+  const handleGoToClients = () => {
+    navigate("/clients");
+  };
+
+  // Check if we're already on the clients page
+  const isClientsPage = location.pathname === "/clients";
+
   return (
     <div className="min-h-screen bg-slate-100">
       {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="mx-auto max-w-5xl px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
-            {subtitle && (
-              <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-4">
-            {/* Custom action buttons passed as prop */}
-            {actions}
-            {/* Logout button */}
-            <button
-              onClick={handleLogout}
-              className="text-xs text-slate-500 hover:text-red-600"
-            >
-              Log out
-            </button>
+      <header className="bg-white shadow-sm sticky top-0 z-40">
+        <div className="mx-auto max-w-5xl px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg sm:text-xl font-semibold text-slate-900 truncate">{title}</h1>
+              {subtitle && (
+                <p className="text-xs text-slate-500 mt-1 truncate">{subtitle}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+              {/* Custom action buttons passed as prop */}
+              {actions}
+              {/* Clients button - only show if not already on clients page */}
+              {!isClientsPage && (
+                <button
+                  onClick={handleGoToClients}
+                  className="text-xs text-slate-600 hover:text-indigo-600 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-50 transition"
+                >
+                  Clients
+                </button>
+              )}
+              {/* Logout button */}
+              <button
+                onClick={handleLogout}
+                className="text-xs text-slate-500 hover:text-red-600 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-50 transition"
+              >
+                Log out
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main content area */}
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-5xl px-3 sm:px-4 py-4 sm:py-6">{children}</main>
     </div>
   );
 }

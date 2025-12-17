@@ -26,9 +26,85 @@ export function authHeaders() {
 }
 
 /**
+ * Decode JWT token to get user information
+ * @returns {Object|null} Decoded token payload with id and role, or null if token is invalid
+ */
+export function decodeToken() {
+  const token = getToken();
+  if (!token) return null;
+
+  try {
+    // JWT tokens have 3 parts: header.payload.signature
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+
+    // Decode base64 payload
+    const decoded = JSON.parse(atob(payload));
+    return decoded;
+  } catch (err) {
+    console.error("Error decoding token:", err);
+    return null;
+  }
+}
+
+/**
+ * Get current user's role from JWT token
+ * @returns {string|null} User role ('admin' or 'staff') or null if not available
+ */
+export function getUserRole() {
+  const decoded = decodeToken();
+  return decoded?.role || null;
+}
+
+/**
+ * Check if current user is an admin
+ * @returns {boolean} True if user is admin, false otherwise
+ */
+export function isAdmin() {
+  return getUserRole() === "admin";
+}
+
+/**
  * Axios instance configured with base URL
  * Use this for all API requests to the backend
  */
 export const api = axios.create({
   baseURL: API_BASE
 });
+
+// Add request interceptor for debugging (only in development)
+if (import.meta.env.DEV) {
+  api.interceptors.request.use(
+    (config) => {
+      console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, {
+        headers: config.headers,
+        baseURL: config.baseURL,
+        fullURL: `${config.baseURL}${config.url}`
+      });
+      return config;
+    },
+    (error) => {
+      console.error("[API Request Error]", error);
+      return Promise.reject(error);
+    }
+  );
+
+  api.interceptors.response.use(
+    (response) => {
+      console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, {
+        status: response.status,
+        data: response.data
+      });
+      return response;
+    },
+    (error) => {
+      console.error(`[API Response Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      return Promise.reject(error);
+    }
+  );
+}

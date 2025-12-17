@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { isAdmin } from "../api";
 
 /**
  * AppLayout component
@@ -28,8 +29,19 @@ function AppLayout({ title, subtitle, actions, children }) {
     navigate("/clients");
   };
 
+  /**
+   * Navigate to users management page
+   */
+  const handleGoToUsers = () => {
+    navigate("/users");
+  };
+
   // Check if we're already on the clients page
   const isClientsPage = location.pathname === "/clients";
+  // Check if we're already on the users page
+  const isUsersPage = location.pathname === "/users";
+  // Check if current user is admin
+  const userIsAdmin = isAdmin();
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -53,6 +65,15 @@ function AppLayout({ title, subtitle, actions, children }) {
                   className="text-xs text-slate-600 hover:text-indigo-600 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-50 transition"
                 >
                   Clients
+                </button>
+              )}
+              {/* Users button - only show for admin users and if not already on users page */}
+              {userIsAdmin && !isUsersPage && (
+                <button
+                  onClick={handleGoToUsers}
+                  className="text-xs text-slate-600 hover:text-indigo-600 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-50 transition"
+                >
+                  Users
                 </button>
               )}
               {/* Logout button */}

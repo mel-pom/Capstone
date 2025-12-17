@@ -7,6 +7,7 @@ import authRoutes from "./routes/authRoutes.js";
 import { auth } from "./middleware/auth.js";
 import clientRoutes from "./routes/clientRoutes.js";
 import entryRoutes from "./routes/entryRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 import { formatErrorResponse } from "./utils/errorHandler.js";
 
 // Load environment variables from .env file
@@ -45,6 +46,9 @@ app.use("/api/clients", clientRoutes);
 
 // ====== ENTRY ROUTES (CREATE, READ, UPDATE, DELETE) ======
 app.use("/api/entries", entryRoutes);
+
+// ====== USER ROUTES (ADMIN ONLY - GET ALL USERS, UPDATE ROLE) ======
+app.use("/api/users", userRoutes);
 
 // ====== PROTECTED TEST ROUTE ======
 app.get("/api/secret", auth, (req, res) => {

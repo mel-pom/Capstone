@@ -17,7 +17,10 @@ const entrySchema = new mongoose.Schema(
       required: true,
       trim: true
     },
-
+    date: {
+      type: Date,
+      default: undefined // Only set if provided
+    }
   },
   {
     timestamps: true // gives createdAt + updatedAt

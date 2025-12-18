@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, authHeaders } from "../api";
 import AppLayout from "../components/AppLayout";
 import Alert from "../components/Alert";
@@ -8,6 +8,7 @@ import { getErrorMessage, isAuthError } from "../utils/errorHandler.js";
 function MealEntryPage() {
   const { id } = useParams(); // clientId
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [clientName, setClientName] = useState("");
   const [error, setError] = useState("");
@@ -22,19 +23,37 @@ function MealEntryPage() {
     snacks: ""
   });
 
+  // Date state - default to today or date from URL query parameter
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const dateParam = searchParams.get('date');
+    if (dateParam) {
+      return dateParam; // Use date from URL if provided
+    }
+    const today = new Date();
+    return today.toISOString().split('T')[0]; // YYYY-MM-DD format
+  });
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) navigate("/");
   }, [navigate]);
 
+  // Sync selectedDate with URL query parameter
+  useEffect(() => {
+    const dateParam = searchParams.get('date');
+    if (dateParam && dateParam !== selectedDate) {
+      setSelectedDate(dateParam);
+    }
+  }, [searchParams]);
+
   /**
-   * Get today's date range (start and end of day in ISO format)
+   * Get date range for a given date (start and end of day in ISO format)
    */
-  const getTodayDateRange = () => {
-    const today = new Date();
-    const startOfDay = new Date(today);
+  const getDateRange = (dateString) => {
+    const date = new Date(dateString);
+    const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(today);
+    const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
     
     return {
@@ -85,8 +104,8 @@ function MealEntryPage() {
         });
         setClientName(clientRes.data?.name || "");
 
-        // Fetch today's meal entry if it exists
-        const { startDate, endDate } = getTodayDateRange();
+        // Fetch meal entry for selected date if it exists
+        const { startDate, endDate } = getDateRange(selectedDate);
         const entriesRes = await api.get(`/api/entries/client/${id}`, {
           headers: authHeaders(),
           params: {
@@ -96,12 +115,21 @@ function MealEntryPage() {
           }
         });
 
-        // If there's a meal entry for today, load it
+        // If there's a meal entry for the selected date, load it
         if (entriesRes.data && entriesRes.data.length > 0) {
-          const todayEntry = entriesRes.data[0]; // Get the most recent one (sorted by createdAt desc)
-          setExistingEntryId(todayEntry._id);
-          const parsedMeals = parseMealDescription(todayEntry.description);
+          const dateEntry = entriesRes.data[0]; // Get the most recent one (sorted by createdAt desc)
+          setExistingEntryId(dateEntry._id);
+          const parsedMeals = parseMealDescription(dateEntry.description);
           setMeals(parsedMeals);
+        } else {
+          // Reset if no entry found for selected date
+          setExistingEntryId(null);
+          setMeals({
+            breakfast: "",
+            lunch: "",
+            dinner: "",
+            snacks: ""
+          });
         }
       } catch (err) {
         console.error("Fetch client/meal error:", err);
@@ -116,7 +144,7 @@ function MealEntryPage() {
     };
 
     fetchClientAndTodayMeal();
-  }, [id, navigate]);
+  }, [id, navigate, selectedDate]);
 
   const handleChange = (field) => (e) => {
     setMeals((prev) => ({ ...prev, [field]: e.target.value }));
@@ -154,6 +182,7 @@ function MealEntryPage() {
       const description = buildMealDescription();
 
       // If editing existing entry, use PUT; otherwise use POST
+      // Note: Backend will also check for existing entries on the same date and update them
       if (existingEntryId) {
         await api.put(
           `/api/entries/${existingEntryId}`,
@@ -163,15 +192,18 @@ function MealEntryPage() {
           { headers: authHeaders() }
         );
       } else {
-        await api.post(
+        const response = await api.post(
           "/api/entries",
           {
             clientId: id,
             category: "meals",
-            description
+            description,
+            date: selectedDate // Include the selected date
           },
           { headers: authHeaders() }
         );
+        // If backend updated an existing entry, we'll get the updated entry back
+        // The entry will have the correct date set in createdAt
       }
 
       navigate(`/clients/${id}`);
@@ -212,7 +244,7 @@ function MealEntryPage() {
           <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-slate-800">
-                {existingEntryId ? "Edit today's meal entry" : "Enter meal details"}
+                {existingEntryId ? "Edit meal entry" : "Enter meal details"}
               </h2>
               {existingEntryId && (
                 <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
@@ -222,6 +254,18 @@ function MealEntryPage() {
             </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Date
+              </label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                max={new Date().toISOString().split('T')[0]} // Prevent future dates
+              />
+            </div>
             <MealField
               label="Breakfast"
               value={meals.breakfast}

@@ -65,6 +65,14 @@ export function isAdmin() {
 }
 
 /**
+ * Get current user's email from localStorage
+ * @returns {string|null} User email or null if not available
+ */
+export function getUserEmail() {
+  return localStorage.getItem("userEmail");
+}
+
+/**
  * Axios instance configured with base URL
  * Use this for all API requests to the backend
  */

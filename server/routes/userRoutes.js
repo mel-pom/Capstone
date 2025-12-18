@@ -1,6 +1,6 @@
 import express from "express";
 import { auth, requireAdmin } from "../middleware/auth.js";
-import { getUsers, updateUserRole } from "../controllers/userController.js";
+import { getUsers, updateUserRole, updateAssignedClients } from "../controllers/userController.js";
 import { isValidObjectId } from "../utils/validateObjectId.js";
 
 const router = express.Router();
@@ -22,5 +22,17 @@ router.patch("/:id/role", auth, requireAdmin, (req, res, next) => {
   }
   next();
 }, updateUserRole);
+
+/**
+ * PATCH /api/users/:id/clients
+ * Update assigned clients for a user (admin only)
+ */
+router.patch("/:id/clients", auth, requireAdmin, (req, res, next) => {
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ error: "Invalid user ID" });
+  }
+  next();
+}, updateAssignedClients);
 
 export default router;

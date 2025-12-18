@@ -190,6 +190,86 @@ function ClientDetailPage() {
     return d.toLocaleDateString();
   };
 
+  /**
+   * Format date for meal card header (e.g., "Monday, January 15, 2024")
+   * Accepts either a date string (YYYY-MM-DD) or an ISO timestamp
+   */
+  const formatDateForMealCard = (dateString) => {
+    if (!dateString) return "";
+    const d = new Date(dateString);
+    // Use local date components to avoid timezone issues
+    // This ensures the date displayed matches the actual date intended
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const day = d.getDate();
+    const localDate = new Date(year, month, day);
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    return localDate.toLocaleDateString('en-US', options);
+  };
+
+  /**
+   * Parse meal description to extract breakfast, lunch, dinner, snacks
+   */
+  const parseMealDescription = (description) => {
+    const parsed = {
+      breakfast: "",
+      lunch: "",
+      dinner: "",
+      snacks: ""
+    };
+
+    if (!description) return parsed;
+
+    const lines = description.split('\n');
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('Breakfast:')) {
+        parsed.breakfast = trimmed.replace(/^Breakfast:\s*/, '').replace(/^—$/, '');
+      } else if (trimmed.startsWith('Lunch:')) {
+        parsed.lunch = trimmed.replace(/^Lunch:\s*/, '').replace(/^—$/, '');
+      } else if (trimmed.startsWith('Dinner:')) {
+        parsed.dinner = trimmed.replace(/^Dinner:\s*/, '').replace(/^—$/, '');
+      } else if (trimmed.startsWith('Snacks:')) {
+        parsed.snacks = trimmed.replace(/^Snacks:\s*/, '').replace(/^—$/, '');
+      }
+    });
+
+    return parsed;
+  };
+
+  /**
+   * Get unique dates from meal entries and sort them
+   */
+  const getUniqueMealDates = (mealEntries) => {
+    const dateMap = new Map();
+    
+    mealEntries.forEach(entry => {
+      if (entry.createdAt) {
+        const date = new Date(entry.createdAt);
+        // Use local date components to avoid timezone issues
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const dateKey = `${year}-${month}-${day}`; // YYYY-MM-DD in local timezone
+        
+        if (!dateMap.has(dateKey)) {
+          dateMap.set(dateKey, []);
+        }
+        dateMap.get(dateKey).push(entry);
+      }
+    });
+
+    // Sort dates (newest first)
+    const sortedDates = Array.from(dateMap.keys()).sort((a, b) => {
+      return new Date(b) - new Date(a);
+    });
+
+    return sortedDates.map(dateKey => ({
+      date: dateKey,
+      entries: dateMap.get(dateKey)
+    }));
+  };
+
   // Check if any filters are active
   const hasActiveFilters = category || search || startDate || endDate;
 
@@ -240,7 +320,7 @@ function ClientDetailPage() {
   return (
     <AppLayout
       title={client?.name || "Client details"}
-      subtitle="Daily documentation timeline and filters."
+      subtitle="Daily documentation"
     >
       {error && <Alert type="error">{error}</Alert>}
 
@@ -283,12 +363,6 @@ function ClientDetailPage() {
       {client && (
         <section className="bg-white rounded-lg shadow-sm p-3 sm:p-4 mb-3 sm:mb-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              to={`/clients/${id}/meals`}
-              className="inline-flex items-center justify-center rounded-md bg-emerald-600 text-white text-xs px-3 py-2 hover:bg-emerald-700 transition"
-            >
-              + Meals
-            </Link>
             <Link
               to={`/clients/${id}/new-entry`}
               className="inline-flex items-center justify-center rounded-md bg-indigo-600 text-white text-xs px-3 py-2 hover:bg-indigo-700 transition"
@@ -522,51 +596,196 @@ function ClientDetailPage() {
         </form>
       </section>
 
-      {/* Entries timeline */}
-      <section className="bg-white rounded-lg shadow-sm p-3 sm:p-4">
-        <h2 className="text-sm font-semibold text-slate-800 mb-3">Entries</h2>
-
-        {loadingEntries ? (
+      {/* Entries by category */}
+      {loadingEntries ? (
+        <section className="bg-white rounded-lg shadow-sm p-3 sm:p-4">
           <Loader text="Loading entries..." />
-        ) : entries.length === 0 ? (
+        </section>
+      ) : entries.length === 0 ? (
+        <section className="bg-white rounded-lg shadow-sm p-3 sm:p-4">
           <p className="text-sm text-slate-500">
             No entries found for this client.
           </p>
-        ) : (
-          <ul className="space-y-3">
-            {entries.map((entry) => (
-              <li
-                key={entry._id}
-                className="relative border border-slate-200 rounded-md px-3 sm:px-4 py-2 sm:py-3"
-              >
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs uppercase tracking-wide text-slate-500">
-                      {entry.category}
-                    </p>
-                    <p className="text-sm text-slate-900 mt-1 break-words">
-                      {entry.description}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                    <p className="text-xs text-slate-400 whitespace-nowrap">
-                      {entry.createdAt && formatDateTime(entry.createdAt)}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteClick(entry._id, entry.description)}
-                      className="text-red-600 hover:text-red-700 text-xs font-medium transition whitespace-nowrap"
-                      title="Delete entry"
-                    >
-                      Delete
-                    </button>
-                  </div>
+        </section>
+      ) : (
+        (() => {
+          // Group entries by category
+          const entriesByCategory = entries.reduce((acc, entry) => {
+            const cat = entry.category || "uncategorized";
+            if (!acc[cat]) {
+              acc[cat] = [];
+            }
+            acc[cat].push(entry);
+            return acc;
+          }, {});
+
+          // Get categories in a consistent order
+          const categoryOrder = [...CATEGORIES, "uncategorized"];
+          const sortedCategories = Object.keys(entriesByCategory).sort((a, b) => {
+            const indexA = categoryOrder.indexOf(a);
+            const indexB = categoryOrder.indexOf(b);
+            if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
+          });
+
+          // Separate meal entries for special handling
+          const mealEntries = entriesByCategory["meals"] || [];
+          const otherCategories = sortedCategories.filter(cat => cat !== "meals");
+
+          // Process meal entries by date
+          const mealDates = getUniqueMealDates(mealEntries);
+          
+          // Get entries to display - always show the last 3 meals
+          const displayedMealDates = mealDates.slice(0, 3);
+
+          return (
+            <div className="space-y-4 sm:space-y-6">
+              {/* Meals card - special expandable card */}
+              <section className="bg-white rounded-lg shadow-sm p-3 sm:p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-slate-800 capitalize">
+                    Meals
+                  </h2>
+                  <Link
+                    to={`/clients/${id}/meals`}
+                    className="inline-flex items-center justify-center rounded-md bg-emerald-600 text-white text-xs px-3 py-2 hover:bg-emerald-700 transition"
+                  >
+                    + Meals
+                  </Link>
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+
+                  {displayedMealDates.length === 0 ? (
+                    <p className="text-sm text-slate-500">No meal entries found.</p>
+                  ) : (
+                    <>
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                        {displayedMealDates.map((dateGroup) => {
+                          // Get the most recent entry for this date (in case there are multiple)
+                          const entry = dateGroup.entries.sort((a, b) => 
+                            new Date(b.createdAt) - new Date(a.createdAt)
+                          )[0];
+                          const parsedMeals = parseMealDescription(entry.description);
+                          // Use the dateGroup.date (YYYY-MM-DD) to ensure correct date display
+                          const entryDate = dateGroup.date ? formatDateForMealCard(dateGroup.date) : "";
+
+                          return (
+                            <li
+                              key={entry._id}
+                              className="relative border border-slate-200 rounded-md px-3 sm:px-4 py-3 sm:py-4"
+                            >
+                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-sm font-medium text-slate-700">
+                                    {entryDate || "Meal Entry"}
+                                  </h3>
+                                </div>
+                                <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                                  <Link
+                                    to={`/clients/${id}/meals?date=${dateGroup.date}`}
+                                    className="text-indigo-600 hover:text-indigo-700 text-xs font-medium transition whitespace-nowrap"
+                                    title="Update entry"
+                                  >
+                                    Update
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteClick(entry._id, entry.description)}
+                                    className="text-red-600 hover:text-red-700 text-xs font-medium transition whitespace-nowrap"
+                                    title="Delete entry"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="space-y-2.5">
+                                <div className="border-l-2 border-orange-300 pl-3 py-1">
+                                  <p className="text-xs font-medium text-slate-600 mb-0.5">Breakfast</p>
+                                  <p className="text-sm text-slate-900">
+                                    {parsedMeals.breakfast || <span className="text-slate-400 italic">Not reported</span>}
+                                  </p>
+                                </div>
+                                <div className="border-l-2 border-green-300 pl-3 py-1">
+                                  <p className="text-xs font-medium text-slate-600 mb-0.5">Lunch</p>
+                                  <p className="text-sm text-slate-900">
+                                    {parsedMeals.lunch || <span className="text-slate-400 italic">Not reported</span>}
+                                  </p>
+                                </div>
+                                <div className="border-l-2 border-indigo-300 pl-3 py-1">
+                                  <p className="text-xs font-medium text-slate-600 mb-0.5">Dinner</p>
+                                  <p className="text-sm text-slate-900">
+                                    {parsedMeals.dinner || <span className="text-slate-400 italic">Not reported</span>}
+                                  </p>
+                                </div>
+                                <div className="border-l-2 border-slate-300 pl-3 py-1">
+                                  <p className="text-xs font-medium text-slate-600 mb-0.5">Snacks</p>
+                                  <p className="text-sm text-slate-900">
+                                    {parsedMeals.snacks || <span className="text-slate-400 italic">Not reported</span>}
+                                  </p>
+                                </div>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <div className="mt-4 pt-3 border-t border-slate-200 flex justify-center">
+                        <Link
+                          to={`/clients/${id}/meals/history`}
+                          className="inline-flex items-center justify-center rounded-md bg-indigo-600 text-white text-xs px-3 py-2 hover:bg-indigo-700 transition"
+                        >
+                          Load More
+                        </Link>
+                      </div>
+                    </>
+                  )}
+                </section>
+
+              {/* Other categories */}
+              {otherCategories.map((categoryName) => (
+                <section
+                  key={categoryName}
+                  className="bg-white rounded-lg shadow-sm p-3 sm:p-4"
+                >
+                  <h2 className="text-sm font-semibold text-slate-800 mb-3 capitalize">
+                    {categoryName}
+                  </h2>
+                  {/* Standard rendering for other categories */}
+                    <ul className="space-y-3">
+                      {entriesByCategory[categoryName].map((entry) => (
+                        <li
+                          key={entry._id}
+                          className="relative border border-slate-200 rounded-md px-3 sm:px-4 py-2 sm:py-3"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-slate-900 mt-1 break-words">
+                                {entry.description}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                              <p className="text-xs text-slate-400 whitespace-nowrap">
+                                {entry.createdAt && formatDateTime(entry.createdAt)}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteClick(entry._id, entry.description)}
+                                className="text-red-600 hover:text-red-700 text-xs font-medium transition whitespace-nowrap"
+                                title="Delete entry"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                </section>
+              ))}
+            </div>
+          );
+        })()
+      )}
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog

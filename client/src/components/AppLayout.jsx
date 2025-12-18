@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { isAdmin } from "../api";
+import { isAdmin, getUserEmail } from "../api";
 
 /**
  * AppLayout component
@@ -19,6 +19,7 @@ function AppLayout({ title, subtitle, actions, children }) {
    */
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("userEmail");
     navigate("/");
   };
 
@@ -42,6 +43,8 @@ function AppLayout({ title, subtitle, actions, children }) {
   const isUsersPage = location.pathname === "/users";
   // Check if current user is admin
   const userIsAdmin = isAdmin();
+  // Get current user's email
+  const userEmail = getUserEmail();
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -55,34 +58,43 @@ function AppLayout({ title, subtitle, actions, children }) {
                 <p className="text-xs text-slate-500 mt-1 truncate">{subtitle}</p>
               )}
             </div>
-            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-              {/* Custom action buttons passed as prop */}
-              {actions}
-              {/* Clients button - only show if not already on clients page */}
-              {!isClientsPage && (
-                <button
-                  onClick={handleGoToClients}
-                  className="text-xs text-slate-600 hover:text-indigo-600 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-50 transition"
-                >
-                  Clients
-                </button>
+            <div className="flex flex-col items-end gap-2 sm:gap-3 flex-shrink-0">
+              {/* User email display - at the top */}
+              {userEmail && (
+                <span className="text-xs text-slate-500 whitespace-nowrap">
+                  Logged in as {userEmail}
+                </span>
               )}
-              {/* Users button - only show for admin users and if not already on users page */}
-              {userIsAdmin && !isUsersPage && (
+              {/* Buttons row - Custom actions, Clients, Users, and Logout aligned horizontally */}
+              <div className="flex items-center gap-2 sm:gap-4">
+                {/* Custom action buttons passed as prop */}
+                {actions}
+                {/* Clients button - only show if not already on clients page */}
+                {!isClientsPage && (
+                  <button
+                    onClick={handleGoToClients}
+                    className="text-xs text-slate-600 hover:text-indigo-600 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-50 transition"
+                  >
+                    Clients
+                  </button>
+                )}
+                {/* Users button - only show for admin users and if not already on users page */}
+                {userIsAdmin && !isUsersPage && (
+                  <button
+                    onClick={handleGoToUsers}
+                    className="text-xs text-slate-600 hover:text-indigo-600 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-50 transition"
+                  >
+                    Users
+                  </button>
+                )}
+                {/* Logout button */}
                 <button
-                  onClick={handleGoToUsers}
-                  className="text-xs text-slate-600 hover:text-indigo-600 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-50 transition"
+                  onClick={handleLogout}
+                  className="text-xs text-slate-500 hover:text-red-600 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-50 transition"
                 >
-                  Users
+                  Log out
                 </button>
-              )}
-              {/* Logout button */}
-              <button
-                onClick={handleLogout}
-                className="text-xs text-slate-500 hover:text-red-600 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-50 transition"
-              >
-                Log out
-              </button>
+              </div>
             </div>
           </div>
         </div>

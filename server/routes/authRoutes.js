@@ -54,10 +54,12 @@ router.post("/register", async (req, res) => {
     }
 
     // Create new user (password will be hashed by User model)
+    // Note: assignedClients is explicitly set to [] - clients can only be assigned by admin via PATCH /api/users/:id/clients
     const user = await User.create({
       email: email.toLowerCase().trim(),
       password,
       role: role || "staff",
+      assignedClients: [], // New users start with no clients assigned
     });
 
     res.status(201).json({

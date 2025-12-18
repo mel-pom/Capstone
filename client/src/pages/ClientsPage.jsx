@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, authHeaders } from "../api";
+import { api, authHeaders, isAdmin } from "../api";
 import AppLayout from "../components/AppLayout";
 import Loader from "../components/Loader";
 import Alert from "../components/Alert";
@@ -123,12 +123,14 @@ function ClientsPage() {
       title="Clients"
       subtitle="Select a client to view their daily documentation."
       actions={
-        <Link
-          to="/clients/new"
-          className="inline-flex items-center justify-center rounded-md bg-indigo-600 text-white text-xs px-3 py-2 hover:bg-indigo-700 transition"
-        >
-          + New Client
-        </Link>
+        isAdmin() && (
+          <Link
+            to="/clients/new"
+            className="inline-flex items-center justify-center rounded-md bg-indigo-600 text-white text-xs px-3 py-2 hover:bg-indigo-700 transition"
+          >
+            + New Client
+          </Link>
+        )
       }
     >
       {error && <Alert type="error">{error}</Alert>}
@@ -137,15 +139,23 @@ function ClientsPage() {
         <Loader text="Loading clients..." />
       ) : clients.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-          <p className="text-sm text-slate-600 mb-4">
-            No clients yet. Create your first client to get started.
-          </p>
-          <Link
-            to="/clients/new"
-            className="inline-flex items-center justify-center rounded-md bg-indigo-600 text-white text-xs px-4 py-2 hover:bg-indigo-700 transition"
-          >
-            + Create First Client
-          </Link>
+          {isAdmin() ? (
+            <>
+              <p className="text-sm text-slate-600 mb-4">
+                No clients yet. Create your first client to get started.
+              </p>
+              <Link
+                to="/clients/new"
+                className="inline-flex items-center justify-center rounded-md bg-indigo-600 text-white text-xs px-4 py-2 hover:bg-indigo-700 transition"
+              >
+                + Create First Client
+              </Link>
+            </>
+          ) : (
+            <p className="text-sm text-slate-600">
+              You have not been assigned any clients. Please reach out to the administrator for access.
+            </p>
+          )}
         </div>
       ) : (
         <ul className="space-y-2">

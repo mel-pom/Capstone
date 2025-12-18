@@ -47,8 +47,13 @@ function LoginPage() {
         password: form.password,
       });
       const token = res.data.token;
+      const userEmail = res.data.user?.email;
       // Store JWT token in localStorage for future authenticated requests
       localStorage.setItem("token", token);
+      // Store user email in localStorage for display purposes
+      if (userEmail) {
+        localStorage.setItem("userEmail", userEmail);
+      }
       // Redirect to clients page after successful login
       window.location.href = "/clients";
     } catch (err) {

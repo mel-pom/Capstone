@@ -5,6 +5,7 @@ import ClientDetailPage from "./pages/ClientDetailPage.jsx";
 import NewEntryPage from "./pages/NewEntryPage.jsx";
 import NewClientPage from "./pages/NewClientPage.jsx";
 import MealEntryPage from "./pages/MealEntryPage.jsx";
+import MealHistoryPage from "./pages/MealHistoryPage.jsx";
 import UsersPage from "./pages/UsersPage.jsx";
 
 /**
@@ -24,6 +25,8 @@ function App() {
       <Route path="/clients/:id/new-entry" element={<NewEntryPage />} />
       {/* Meal entry page - protected route (must come before /clients/:id) */}
       <Route path="/clients/:id/meals" element={<MealEntryPage />} />
+      {/* Meal history page - protected route (must come before /clients/:id) */}
+      <Route path="/clients/:id/meals/history" element={<MealHistoryPage />} />
       {/* Client detail page with entries - protected route */}
       <Route path="/clients/:id" element={<ClientDetailPage />} />
       {/* Users management page - protected route (admin only) */}

@@ -1,10 +1,36 @@
 import express from "express";
 import Client from "../models/Client.js";
+import User from "../models/User.js";
 import { auth, requireAdmin } from "../middleware/auth.js";
 import { isValidObjectId } from "../utils/validateObjectId.js";
 import { formatErrorResponse } from "../utils/errorHandler.js";
 
 const router = express.Router();
+
+/**
+ * Helper function to check if a user has access to a client
+ * @param {string} userId - User ID
+ * @param {string} userRole - User role ('admin' or 'staff')
+ * @param {string} clientId - Client ID to check access for
+ * @returns {Promise<boolean>} - True if user has access, false otherwise
+ */
+async function hasClientAccess(userId, userRole, clientId) {
+  // Admins have access to all clients
+  if (userRole === "admin") {
+    return true;
+  }
+
+  // Staff users only have access to their assigned clients
+  const user = await User.findById(userId).select("assignedClients");
+  if (!user) {
+    return false;
+  }
+
+  // Check if clientId is in user's assignedClients array
+  return user.assignedClients.some(
+    (assignedId) => assignedId.toString() === clientId.toString()
+  );
+}
 
 /**
  * POST /api/clients
@@ -91,11 +117,33 @@ router.post("/", auth, requireAdmin, async (req, res) => {
 
 /**
  * GET /api/clients
- * Get all clients (staff + admin)
+ * Get all clients (admin sees all, staff sees only assigned clients)
  */
 router.get("/", auth, async (req, res) => {
   try {
-    const clients = await Client.find().sort({ name: 1 });
+    let clients;
+
+    // Admins see all clients
+    if (req.user.role === "admin") {
+      clients = await Client.find().sort({ name: 1 });
+    } else {
+      // Staff users only see their assigned clients
+      const user = await User.findById(req.user.id).select("assignedClients");
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // If user has no assigned clients, return empty array
+      if (!user.assignedClients || user.assignedClients.length === 0) {
+        return res.json([]);
+      }
+
+      // Find only assigned clients
+      clients = await Client.find({
+        _id: { $in: user.assignedClients },
+      }).sort({ name: 1 });
+    }
+
     res.json(clients);
   } catch (err) {
     console.error("List clients error:", err);
@@ -108,7 +156,7 @@ router.get("/", auth, async (req, res) => {
 
 /**
  * GET /api/clients/:id
- * Get a single client by ID
+ * Get a single client by ID (admin or staff with assigned access)
  */
 router.get("/:id", auth, async (req, res) => {
   try {
@@ -122,6 +170,14 @@ router.get("/:id", auth, async (req, res) => {
 
     if (!client) {
       return res.status(404).json({ error: "Client not found" });
+    }
+
+    // Check if user has access to this client
+    const hasAccess = await hasClientAccess(req.user.id, req.user.role, id);
+    if (!hasAccess) {
+      return res.status(403).json({
+        error: "You do not have access to this client",
+      });
     }
 
     res.json(client);

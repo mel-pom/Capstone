@@ -17,6 +17,11 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: ["staff", "admin"],
         default: "staff"
+      },
+      assignedClients: {
+        type: [mongoose.Schema.Types.ObjectId],
+        ref: "Client",
+        default: []
       }
     });
     

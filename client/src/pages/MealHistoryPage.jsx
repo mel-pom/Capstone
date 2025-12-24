@@ -122,15 +122,21 @@ function MealHistoryPage() {
    */
   const formatDateForMealCard = (dateString) => {
     if (!dateString) return "";
-    const d = new Date(dateString);
-    // Use local date components to avoid timezone issues
-    // This ensures the date displayed matches the actual date intended
-    const year = d.getFullYear();
-    const month = d.getMonth();
-    const day = d.getDate();
-    const localDate = new Date(year, month, day);
+    let d;
+    // If dateString is in YYYY-MM-DD format, parse it directly to avoid UTC interpretation
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      const [year, month, day] = dateString.split('-').map(Number);
+      d = new Date(year, month - 1, day); // month is 0-indexed
+    } else {
+      // For ISO timestamps, extract local date components to avoid timezone issues
+      const tempDate = new Date(dateString);
+      const year = tempDate.getFullYear();
+      const month = tempDate.getMonth();
+      const day = tempDate.getDate();
+      d = new Date(year, month, day);
+    }
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    return localDate.toLocaleDateString('en-US', options);
+    return d.toLocaleDateString('en-US', options);
   };
 
   /**

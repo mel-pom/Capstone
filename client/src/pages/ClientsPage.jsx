@@ -124,12 +124,20 @@ function ClientsPage() {
       subtitle="Select a client to view their daily documentation."
       actions={
         isAdmin() && (
-          <Link
-            to="/clients/new"
-            className="inline-flex items-center justify-center rounded-md bg-indigo-600 text-white text-xs px-3 py-2 hover:bg-indigo-700 transition"
-          >
-            + New Client
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/clients/new"
+              className="inline-flex items-center justify-center rounded-md bg-indigo-600 text-white text-xs px-3 py-2 hover:bg-indigo-700 transition"
+            >
+              + New Client
+            </Link>
+            <Link
+              to="/cards"
+              className="inline-flex items-center justify-center rounded-md bg-indigo-600 text-white text-xs px-3 py-2 hover:bg-indigo-700 transition"
+            >
+              + Create Card
+            </Link>
+          </div>
         )
       }
     >

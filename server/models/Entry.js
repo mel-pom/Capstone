@@ -20,6 +20,13 @@ const entrySchema = new mongoose.Schema(
     date: {
       type: Date,
       default: undefined // Only set if provided
+    },
+    mealType: {
+      type: String,
+      enum: ["breakfast", "lunch", "dinner", "snacks"],
+      required: function() {
+        return this.category === "meals";
+      }
     }
   },
   {

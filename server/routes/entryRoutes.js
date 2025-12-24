@@ -39,13 +39,30 @@ async function hasClientAccess(userId, userRole, clientId) {
  */
 router.post("/", auth, async (req, res) => {
   try {
-    const { clientId, category, description, date } = req.body;
+    const { clientId, category, description, date, mealType } = req.body;
 
     // Validate required fields
     if (!clientId || !category || !description) {
       return res.status(400).json({
         error: "clientId, category, and description are required",
       });
+    }
+
+    // For meals category, mealType is required
+    if (category === "meals" && !mealType) {
+      return res.status(400).json({
+        error: "mealType is required for meals category",
+      });
+    }
+
+    // Validate mealType if provided
+    if (mealType) {
+      const validMealTypes = ["breakfast", "lunch", "dinner", "snacks"];
+      if (!validMealTypes.includes(mealType)) {
+        return res.status(400).json({
+          error: `Invalid mealType. Must be one of: ${validMealTypes.join(", ")}`,
+        });
+      }
     }
 
     // Validate clientId format
@@ -104,9 +121,9 @@ router.post("/", auth, async (req, res) => {
       }
     }
 
-    // For meals category, check if entry already exists for this date
-    // Only one entry per day is allowed for meals
-    if (category === "meals" && entryDate) {
+    // For meals category, check if entry already exists for this date and mealType
+    // Only one entry per mealType per day is allowed for meals (except snacks which allows multiple)
+    if (category === "meals" && entryDate && mealType && mealType !== "snacks") {
       const startOfDay = new Date(entryDate);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(entryDate);
@@ -115,6 +132,7 @@ router.post("/", auth, async (req, res) => {
       const existingEntry = await Entry.findOne({
         clientId,
         category: "meals",
+        mealType: mealType,
         createdAt: {
           $gte: startOfDay,
           $lte: endOfDay
@@ -139,6 +157,11 @@ router.post("/", auth, async (req, res) => {
       category,
       description: description.trim(),
     };
+
+    // Add mealType if provided
+    if (mealType) {
+      entryData.mealType = mealType;
+    }
 
     // If date is provided, set createdAt to that date
     if (entryDate) {
@@ -256,7 +279,7 @@ router.put("/:id", auth, async (req, res) => {
       return res.status(400).json({ error: "Invalid entry ID format" });
     }
 
-    const { category, description } = req.body;
+    const { category, description, mealType } = req.body;
 
     // Validate at least one field is provided
     if (category === undefined && description === undefined) {
@@ -271,6 +294,16 @@ router.put("/:id", auth, async (req, res) => {
       if (!validCategories.includes(category)) {
         return res.status(400).json({
           error: `Invalid category. Must be one of: ${validCategories.join(", ")}`,
+        });
+      }
+    }
+
+    // Validate mealType if provided
+    if (mealType !== undefined) {
+      const validMealTypes = ["breakfast", "lunch", "dinner", "snacks"];
+      if (!validMealTypes.includes(mealType)) {
+        return res.status(400).json({
+          error: `Invalid mealType. Must be one of: ${validMealTypes.join(", ")}`,
         });
       }
     }
@@ -308,6 +341,7 @@ router.put("/:id", auth, async (req, res) => {
     const updateData = {};
     if (category !== undefined) updateData.category = category;
     if (description !== undefined) updateData.description = description.trim();
+    if (mealType !== undefined) updateData.mealType = mealType;
 
     const updatedEntry = await Entry.findByIdAndUpdate(
       id,

@@ -37,10 +37,19 @@ function AppLayout({ title, subtitle, actions, children }) {
     navigate("/users");
   };
 
+  /**
+   * Navigate to card management page
+   */
+  const handleGoToCards = () => {
+    navigate("/cards");
+  };
+
   // Check if we're already on the clients page
   const isClientsPage = location.pathname === "/clients";
   // Check if we're already on the users page
   const isUsersPage = location.pathname === "/users";
+  // Check if we're already on the cards page
+  const isCardsPage = location.pathname === "/cards";
   // Check if current user is admin
   const userIsAdmin = isAdmin();
   // Get current user's email
@@ -76,6 +85,15 @@ function AppLayout({ title, subtitle, actions, children }) {
                     className="text-xs text-slate-600 hover:text-indigo-600 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-50 transition"
                   >
                     Clients
+                  </button>
+                )}
+                {/* Cards button - only show for admin users and if not already on cards page */}
+                {userIsAdmin && !isCardsPage && (
+                  <button
+                    onClick={handleGoToCards}
+                    className="text-xs text-slate-600 hover:text-indigo-600 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-50 transition"
+                  >
+                    Cards
                   </button>
                 )}
                 {/* Users button - only show for admin users and if not already on users page */}

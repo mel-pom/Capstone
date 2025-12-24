@@ -8,6 +8,8 @@ import { auth } from "./middleware/auth.js";
 import clientRoutes from "./routes/clientRoutes.js";
 import entryRoutes from "./routes/entryRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import cardRoutes from "./routes/cardRoutes.js";
+import cardEntryRoutes from "./routes/cardEntryRoutes.js";
 import { formatErrorResponse } from "./utils/errorHandler.js";
 
 // Load environment variables from .env file
@@ -49,6 +51,18 @@ app.use("/api/entries", entryRoutes);
 
 // ====== USER ROUTES (ADMIN ONLY - GET ALL USERS, UPDATE ROLE) ======
 app.use("/api/users", userRoutes);
+
+// ====== CARD ROUTES (ADMIN ONLY - CREATE, READ, UPDATE, DELETE, ASSIGN) ======
+app.use("/api/cards", cardRoutes);
+
+// ====== CARD ENTRY ROUTES (STAFF CAN CREATE, ADMIN CAN UNLOCK) ======
+app.use("/api/card-entries", cardEntryRoutes);
+
+// ====== CARD ROUTES (ADMIN ONLY - CREATE, READ, UPDATE, DELETE, ASSIGN) ======
+app.use("/api/cards", cardRoutes);
+
+// ====== CARD ENTRY ROUTES (STAFF CAN CREATE, ADMIN CAN UNLOCK) ======
+app.use("/api/card-entries", cardEntryRoutes);
 
 // ====== PROTECTED TEST ROUTE ======
 app.get("/api/secret", auth, (req, res) => {

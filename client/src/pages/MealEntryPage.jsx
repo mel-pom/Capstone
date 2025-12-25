@@ -692,7 +692,7 @@ function MealEntryPage() {
 
             {/* Save All button at the bottom */}
             <div className="bg-white rounded-lg shadow-sm p-4 border-t-2 border-indigo-200">
-              <div className="flex justify-end">
+              <div className="flex justify-center">
                 <button
                   type="button"
                   onClick={handleSaveAll}

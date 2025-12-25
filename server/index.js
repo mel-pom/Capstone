@@ -87,13 +87,19 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Export app for testing
+export default app;
+
 // ============ MongoDB Connection ============
 // Connect to MongoDB database using connection string from environment
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("Connected to MongoDB");
-    // Start Express server on specified port
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-  })
-  .catch((err) => console.error("MongoDB connection error:", err));
+// Only start server if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  mongoose
+    .connect(process.env.MONGO_URI)
+    .then(() => {
+      console.log("Connected to MongoDB");
+      // Start Express server on specified port
+      app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    })
+    .catch((err) => console.error("MongoDB connection error:", err));
+}

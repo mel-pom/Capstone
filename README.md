@@ -17,6 +17,9 @@ A full-stack web application for managing daily documentation entries for client
 - **Responsive Design**: Mobile-friendly interface that works on all devices
 - **Delete Confirmations**: Safety dialogs to prevent accidental deletions
 
+## IMPORTANT NOTE TO GET STARTED
+- Initial users have a "staff" role; you will need an admin account to use some of the features and assign a new user to be an admin. See Dev Log for admin account username and password to start. 
+
 ## 📋 Tech Stack
 
 ### Frontend

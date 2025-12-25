@@ -4,7 +4,8 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "mocha --timeout 10000 --exit test/*.test.js",
+    "test:watch": "mocha --timeout 10000 --exit --watch test/*.test.js",
     "dev": "nodemon index.js",
     "start": "node index.js"
   },
@@ -21,6 +22,9 @@
     "mongoose": "^9.0.0"
   },
   "devDependencies": {
+    "chai": "^4.3.10",
+    "chai-http": "^4.4.0",
+    "mocha": "^10.7.3",
     "nodemon": "^3.1.11"
   }
 }

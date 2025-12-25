@@ -87,6 +87,13 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Log incoming request for debugging (without sensitive data)
+    console.log("Login attempt received:", { 
+      email: email ? email.toLowerCase().trim() : null,
+      hasPassword: !!password,
+      passwordLength: password?.length || 0
+    });
+
     // Validate required fields
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password are required" });
@@ -99,14 +106,17 @@ router.post("/login", async (req, res) => {
     }
 
     // Find user by email (case-insensitive)
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
+      console.log(`Login attempt failed: User not found for email: ${normalizedEmail}`);
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
     // Verify password using bcrypt comparison
     const match = await user.comparePassword(password);
     if (!match) {
+      console.log(`Login attempt failed: Invalid password for email: ${normalizedEmail}`);
       return res.status(401).json({ error: "Invalid email or password" });
     }
 

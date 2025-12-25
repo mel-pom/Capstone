@@ -41,10 +41,21 @@ function LoginPage() {
     setSuccess("");
 
     try {
+      // Validate form before sending request
+      if (!form.email || !form.password) {
+        setError("Please enter both email and password");
+        return;
+      }
+
+      console.log("Attempting login for:", form.email);
       // Send login request to backend
       const res = await axios.post(`${API_BASE}/api/auth/login`, {
         email: form.email,
         password: form.password,
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       const token = res.data.token;
       const userEmail = res.data.user?.email;
@@ -58,7 +69,21 @@ function LoginPage() {
       window.location.href = "/clients";
     } catch (err) {
       console.error("Login error:", err);
-      setError(getErrorMessage(err, "Login failed. Please check your credentials and try again."));
+      // Log detailed error information for debugging
+      const errorDetails = {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        message: err.message,
+        url: err.config?.url,
+        requestData: { email: form.email, hasPassword: !!form.password }
+      };
+      console.error("Error details:", errorDetails);
+      
+      // Extract error message
+      const errorMessage = getErrorMessage(err, "Login failed. Please check your credentials and try again.");
+      console.log("Displayed error message:", errorMessage);
+      setError(errorMessage);
     }
   };
 

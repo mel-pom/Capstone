@@ -34,11 +34,14 @@ export const getErrorMessage = (error, defaultMessage = "An error occurred") => 
   }
 
   // Add context based on status code
+  // Note: For 401, use the server's message if available (e.g., "Invalid email or password")
+  // Otherwise, show generic session expired message
   switch (status) {
     case 400:
       return message || "Invalid request. Please check your input and try again.";
     case 401:
-      return "Your session has expired. Please log in again.";
+      // Use server message if available (for login errors), otherwise show session expired
+      return message || "Your session has expired. Please log in again.";
     case 403:
       return message || "You don't have permission to perform this action.";
     case 404:
